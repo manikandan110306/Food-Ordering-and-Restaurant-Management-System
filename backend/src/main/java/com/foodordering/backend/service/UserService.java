@@ -13,19 +13,16 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public UserService( UserRepository userRepository, PasswordEncoder passwordEncoder) 
-    {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
-    public User registerCustomer( String fullName, String email, String rawPassword)
-    {
-        if(userRepository.existsByEmail(email))
-        {
+    public User registerCustomer(String fullName, String email, String rawPassword) {
+        if (userRepository.existsByEmail(email)) {
             throw new IllegalArgumentException("An Account with this email is already exist.");
         }
-        User user=new User();
+        User user = new User();
         user.setFullName(fullName);
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(rawPassword));
@@ -35,36 +32,48 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    public User login(String email, String rawPassword)
+    public User registerRestaurantOwner( String fullName, String email, String rawPassword) 
     {
-        User user=userRepository.findByEmail(email)
-            .orElseThrow(() -> new IllegalArgumentException("Invalid Email or Password")
-        );
 
-        if(!passwordEncoder.matches(rawPassword,user.getPasswordHash()))
+        if (userRepository.existsByEmail(email)) 
         {
+            throw new IllegalArgumentException( "An account with this email already exists");
+        }
+
+        User user = new User();
+
+        user.setFullName(fullName);
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode(rawPassword));
+        user.setRole(Role.RESTAURANT_OWNER);
+        user.setEnabled(true);
+
+        return userRepository.save(user);
+    }
+
+    public User login(String email, String rawPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid Email or Password"));
+
+        if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
             throw new IllegalArgumentException("Invalid Email or Password");
         }
 
-        if(!user.isEnabled())
-        {
+        if (!user.isEnabled()) {
             throw new IllegalArgumentException("This account is disabled");
         }
 
         return user;
     }
 
-    public User updateProfile(User user,String fullName)
-    {
+    public User updateProfile(User user, String fullName) {
         user.setFullName(fullName);
 
         return userRepository.save(user);
     }
 
-    public void changePassword(User user, String currentPassword, String newPassword )
-    {
-        if(!passwordEncoder.matches(currentPassword, user.getPasswordHash()))
-        {
+    public void changePassword(User user, String currentPassword, String newPassword) {
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw new IllegalArgumentException("Current Password is incorrect");
         }
 

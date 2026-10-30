@@ -36,8 +36,7 @@ public class UserController {
     private final UserService userService;
     private final JwtService jwtService;
 
-    public UserController( UserService userService, JwtService jwtService) 
-    {
+    public UserController(UserService userService, JwtService jwtService) {
         this.userService = userService;
         this.jwtService = jwtService;
     }
@@ -56,6 +55,32 @@ public class UserController {
                     .status(HttpStatus.CREATED)
                     .body(response);
         } catch (IllegalArgumentException exception) {
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @PostMapping("/register/owner")
+    public ResponseEntity<?> registerRestaurantOwner( @Valid @RequestBody RegisterRequest request) 
+    {
+        try 
+        {
+            User savedUser = userService.registerRestaurantOwner(
+                request.getFullName(),
+                request.getEmail(),
+                request.getPassword()
+            );
+
+            UserResponse response = new UserResponse(savedUser);
+
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(response);
+
+        } 
+        catch (IllegalArgumentException exception) 
+        {
             return ResponseEntity
                     .status(HttpStatus.CONFLICT)
                     .body(Map.of("message", exception.getMessage()));
@@ -87,55 +112,47 @@ public class UserController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<UserResponse> getCurrentUser( Authentication authentication)
-    {
-        User user=(User) authentication.getPrincipal();
-        UserResponse response=new UserResponse(user);
+    public ResponseEntity<UserResponse> getCurrentUser(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        UserResponse response = new UserResponse(user);
 
         return ResponseEntity.ok(response);
     }
 
-    @PutMapping ("/me")
-    public ResponseEntity<UserResponse> updateProfile( @Valid @RequestBody UpdateProfileRequest request, Authentication authentication)
-    {
-        User currentUser=(User)authentication.getPrincipal();
+    @PutMapping("/me")
+    public ResponseEntity<UserResponse> updateProfile(@Valid @RequestBody UpdateProfileRequest request,
+            Authentication authentication) {
+        User currentUser = (User) authentication.getPrincipal();
 
         User updatedUser = userService.updateProfile(currentUser, request.getFullName());
 
-        UserResponse response=new UserResponse(updatedUser);
+        UserResponse response = new UserResponse(updatedUser);
 
         return ResponseEntity.ok(response);
     }
 
-    @PutMapping ("/change-password")
-    public ResponseEntity<?>changePassword( @Valid @RequestBody ChangePasswordRequest request, Authentication authentication)
-    {
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest request,
+            Authentication authentication) {
 
-        User currentUser=(User) authentication.getPrincipal();
+        User currentUser = (User) authentication.getPrincipal();
 
-        try
-        {
+        try {
             userService.changePassword(
-                currentUser, 
-                request.getCurrentPassword(), 
-                request.getNewPassword()
-            );
+                    currentUser,
+                    request.getCurrentPassword(),
+                    request.getNewPassword());
 
             return ResponseEntity.ok(
-                Map.of(
-                    "message",
-                    "Password Changed Sucessfully"
-                )
-            );
-        }
-        catch(IllegalArgumentException exception)
-        {
+                    Map.of(
+                            "message",
+                            "Password Changed Sucessfully"));
+        } catch (IllegalArgumentException exception) {
             return ResponseEntity
-                .badRequest()
-                .body(Map.of(
-                    "message",
-                    exception.getMessage()
-                ));
+                    .badRequest()
+                    .body(Map.of(
+                            "message",
+                            exception.getMessage()));
         }
     }
 
