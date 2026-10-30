@@ -53,4 +53,23 @@ public class UserService {
 
         return user;
     }
+
+    public User updateProfile(User user,String fullName)
+    {
+        user.setFullName(fullName);
+
+        return userRepository.save(user);
+    }
+
+    public void changePassword(User user, String currentPassword, String newPassword )
+    {
+        if(!passwordEncoder.matches(currentPassword, user.getPasswordHash()))
+        {
+            throw new IllegalArgumentException("Current Password is incorrect");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+
+        userRepository.save(user);
+    }
 }

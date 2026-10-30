@@ -2,6 +2,7 @@ package com.foodordering.backend.controller;
 
 import java.util.Map;
 
+import org.apache.catalina.connector.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +15,12 @@ import com.foodordering.backend.dto.UserResponse;
 import com.foodordering.backend.dto.LoginRequest;
 import com.foodordering.backend.entity.User;
 import com.foodordering.backend.service.UserService;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import com.foodordering.backend.dto.UpdateProfileRequest;
+import com.foodordering.backend.dto.ChangePasswordRequest;
+import org.springframework.web.bind.annotation.PutMapping;
 
 import io.jsonwebtoken.Jwt;
 
@@ -76,6 +83,59 @@ public class UserController {
             return ResponseEntity
                     .status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> getCurrentUser( Authentication authentication)
+    {
+        User user=(User) authentication.getPrincipal();
+        UserResponse response=new UserResponse(user);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping ("/me")
+    public ResponseEntity<UserResponse> updateProfile( @Valid @RequestBody UpdateProfileRequest request, Authentication authentication)
+    {
+        User currentUser=(User)authentication.getPrincipal();
+
+        User updatedUser = userService.updateProfile(currentUser, request.getFullName());
+
+        UserResponse response=new UserResponse(updatedUser);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping ("/change-password")
+    public ResponseEntity<?>changePassword( @Valid @RequestBody ChangePasswordRequest request, Authentication authentication)
+    {
+
+        User currentUser=(User) authentication.getPrincipal();
+
+        try
+        {
+            userService.changePassword(
+                currentUser, 
+                request.getCurrentPassword(), 
+                request.getNewPassword()
+            );
+
+            return ResponseEntity.ok(
+                Map.of(
+                    "message",
+                    "Password Changed Sucessfully"
+                )
+            );
+        }
+        catch(IllegalArgumentException exception)
+        {
+            return ResponseEntity
+                .badRequest()
+                .body(Map.of(
+                    "message",
+                    exception.getMessage()
+                ));
         }
     }
 
