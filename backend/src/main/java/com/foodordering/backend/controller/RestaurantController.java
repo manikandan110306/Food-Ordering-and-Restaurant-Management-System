@@ -1,5 +1,6 @@
 package com.foodordering.backend.controller;
 
+import java.util.List;
 import java.util.Map;
 
 import jakarta.validation.Valid;
@@ -7,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,8 +20,6 @@ import com.foodordering.backend.entity.Role;
 import com.foodordering.backend.entity.User;
 import com.foodordering.backend.entity.Restaurant;
 import com.foodordering.backend.service.RestaurantService;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 @RestController
 @RequestMapping("/api/restaurants")
@@ -32,29 +32,25 @@ public class RestaurantController {
     }
 
     @PostMapping
-    public ResponseEntity<?> registerRestaurant( @Valid @RequestBody RestaurantRequest request, Authentication authentication) 
-    {
+    public ResponseEntity<?> registerRestaurant(@Valid @RequestBody RestaurantRequest request,
+            Authentication authentication) {
         User currentUser = (User) authentication.getPrincipal();
-        if (currentUser.getRole() != Role.RESTAURANT_OWNER) 
-        {
+        if (currentUser.getRole() != Role.RESTAURANT_OWNER) {
             return ResponseEntity
-                .status(HttpStatus.FORBIDDEN)
-                .body(Map.of(
-                    "message",
-                    "Only restaurant owners can register restaurants")
-            );
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(Map.of(
+                            "message",
+                            "Only restaurant owners can register restaurants"));
         }
 
-        try 
-        {
+        try {
             Restaurant restaurant = restaurantService.registerRestaurant(
                     request.getName(),
                     request.getDescription(),
                     request.getAddress(),
                     request.getPhone(),
                     request.getEmail(),
-                    currentUser
-            );
+                    currentUser);
             RestaurantResponse response = new RestaurantResponse(restaurant);
 
             return ResponseEntity
@@ -71,6 +67,26 @@ public class RestaurantController {
         }
     }
 
-    
+    @GetMapping("/my")
+    public ResponseEntity<?> getMyRestaurants(Authentication authentication) {
+
+        User currentUser = (User) authentication.getPrincipal();
+
+        if (currentUser.getRole() != Role.RESTAURANT_OWNER) {
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(Map.of(
+                            "message",
+                            "Only restaurant owners can view their restaurants"));
+        }
+
+        List<Restaurant> restaurants = restaurantService.getRestaurantsByOwner(currentUser.getId());
+
+        List<RestaurantResponse> response = restaurants.stream()
+                .map(RestaurantResponse::new)
+                .toList();
+
+        return ResponseEntity.ok(response);
+    }
 
 }

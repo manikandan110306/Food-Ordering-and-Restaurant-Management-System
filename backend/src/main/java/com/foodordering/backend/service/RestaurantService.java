@@ -1,5 +1,7 @@
 package com.foodordering.backend.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 
 import com.foodordering.backend.entity.Restaurant;
@@ -17,14 +19,21 @@ public class RestaurantService {
         this.restaurantRepository = restaurantRepository;
     }
 
+    public List<Restaurant> getRestaurantsByOwner(Long ownerId) {
+        return restaurantRepository.findByOwnerId(ownerId);
+    }
+
+    public List<Restaurant> getPendingRestaurants() {
+        return restaurantRepository.findByStatus(RestaurantStatus.PENDING);
+    }
+
     public Restaurant registerRestaurant(
             String name,
             String description,
             String address,
             String phone,
             String email,
-            User owner) 
-    {
+            User owner) {
 
         if (owner.getRole() != Role.RESTAURANT_OWNER) {
             throw new IllegalArgumentException("Only restaurant owners can register restaurants");
@@ -44,6 +53,37 @@ public class RestaurantService {
         restaurant.setEmail(email);
         restaurant.setOwner(owner);
         restaurant.setStatus(RestaurantStatus.PENDING);
+
+        return restaurantRepository.save(restaurant);
+    }
+
+    public Restaurant approveRestaurant(Long restaurantId) {
+        Restaurant restaurant = restaurantRepository.findById(restaurantId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Restaurant not found with ID: " + restaurantId));
+
+        if (restaurant.getStatus() != RestaurantStatus.PENDING) {
+            throw new IllegalArgumentException(
+                    "Only pending restaurants can be approved");
+        }
+
+        restaurant.setStatus(RestaurantStatus.APPROVED);
+
+        return restaurantRepository.save(restaurant);
+    }
+
+    public Restaurant rejectRestaurant(Long restaurantId) 
+    {
+        Restaurant restaurant = restaurantRepository.findById(restaurantId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Restaurant not found with ID: " + restaurantId));
+
+        if (restaurant.getStatus() != RestaurantStatus.PENDING) {
+            throw new IllegalArgumentException(
+                    "Only pending restaurants can be rejected");
+        }
+
+        restaurant.setStatus(RestaurantStatus.REJECTED);
 
         return restaurantRepository.save(restaurant);
     }

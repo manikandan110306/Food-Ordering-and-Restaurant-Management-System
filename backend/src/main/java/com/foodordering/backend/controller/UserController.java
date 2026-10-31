@@ -2,7 +2,6 @@ package com.foodordering.backend.controller;
 
 import java.util.Map;
 
-import org.apache.catalina.connector.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,10 +19,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import com.foodordering.backend.dto.UpdateProfileRequest;
 import com.foodordering.backend.dto.ChangePasswordRequest;
-import org.springframework.web.bind.annotation.PutMapping;
-
-import io.jsonwebtoken.Jwt;
-
 import com.foodordering.backend.dto.LoginResponse;
 import com.foodordering.backend.service.JwtService;
 
