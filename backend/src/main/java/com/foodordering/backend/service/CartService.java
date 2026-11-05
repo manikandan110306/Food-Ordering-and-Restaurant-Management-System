@@ -173,7 +173,6 @@ public class CartService {
         return new CartResponse(cart);
     }
 
-    // Find an existing cart or create a new one
     private Cart getOrCreateCart(User customer) {
 
         return cartRepository.findByUserId(customer.getId())
@@ -187,7 +186,6 @@ public class CartService {
                 });
     }
 
-    // Ensure that only customers can manage shopping carts
     private void validateCustomer(User customer) {
 
         if (customer == null || customer.getRole() != Role.CUSTOMER) {
