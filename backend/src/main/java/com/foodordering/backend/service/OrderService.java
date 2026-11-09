@@ -21,6 +21,10 @@ import com.foodordering.backend.entity.User;
 import com.foodordering.backend.repository.CartRepository;
 import com.foodordering.backend.repository.CustomerOrderRepository;
 
+import com.foodordering.backend.entity.Payment;
+import com.foodordering.backend.entity.PaymentMethod;
+import com.foodordering.backend.entity.PaymentStatus;
+
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -118,6 +122,18 @@ public class OrderService {
         }
 
         order.setTotalAmount(totalAmount);
+
+        Payment payment = new Payment();
+
+        payment.setCustomerOrder(order);
+
+        payment.setAmount(order.getTotalAmount());
+
+        payment.setPaymentMethod(PaymentMethod.CASH_ON_DELIVERY);
+
+        payment.setPaymentStatus(PaymentStatus.PENDING);
+
+        order.setPayment(payment);
 
         CustomerOrder savedOrder = customerOrderRepository.save(order);
 
