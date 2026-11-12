@@ -51,8 +51,13 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/api/public/**")
                         .permitAll()
-                        .anyRequest().authenticated()
-                )
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.GET,
+                                "/api/reviews/restaurant/**")
+                        .permitAll()
+
+                        .anyRequest().authenticated())
 
                 .addFilterBefore(
                         jwtAuthenticationFilter,
