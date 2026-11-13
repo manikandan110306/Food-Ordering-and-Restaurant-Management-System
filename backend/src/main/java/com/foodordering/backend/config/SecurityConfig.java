@@ -17,53 +17,56 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 public class SecurityConfig {
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+                return new BCryptPasswordEncoder();
+        }
 
-    @Bean
-    public UserDetailsService userDetailsService() {
-        return username -> {
-            throw new UsernameNotFoundException(
-                    "Username/password authentication is not used in this application");
-        };
-    }
+        @Bean
+        public UserDetailsService userDetailsService() {
+                return username -> {
+                        throw new UsernameNotFoundException(
+                                        "Username/password authentication is not used in this application");
+                };
+        }
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter)
-            throws Exception {
-        http
-                .cors(Customizer.withDefaults())
-                .csrf(csrf -> csrf.disable())
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                        JwtAuthenticationFilter jwtAuthenticationFilter)
+                        throws Exception {
+                http
+                                .cors(Customizer.withDefaults())
+                                .csrf(csrf -> csrf.disable())
 
-                .formLogin(form -> form.disable())
+                                .formLogin(form -> form.disable())
 
-                .httpBasic(basic -> basic.disable())
+                                .httpBasic(basic -> basic.disable())
 
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(
-                                "/api/health",
-                                "/api/auth/register",
-                                "/api/auth/register/owner",
-                                "/api/auth/login",
-                                "/api/public/**")
-                        .permitAll()
+                                .authorizeHttpRequests(authorize -> authorize
+                                                .requestMatchers(
+                                                                "/api/health",
+                                                                "/api/auth/register",
+                                                                "/api/auth/register/owner",
+                                                                "/api/auth/login",
+                                                                "/api/public/**",
+                                                                "/api/search/**")
+                                                .permitAll()
 
-                        .requestMatchers(
-                                org.springframework.http.HttpMethod.GET,
-                                "/api/reviews/restaurant/**")
-                        .permitAll()
+                                                .requestMatchers(
+                                                                org.springframework.http.HttpMethod.GET,
+                                                                "/api/reviews/restaurant/**")
+                                                .permitAll()
 
-                        .anyRequest().authenticated())
+                                                .anyRequest().authenticated())
 
-                .addFilterBefore(
-                        jwtAuthenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class);
+                                .addFilterBefore(
+                                                jwtAuthenticationFilter,
+                                                UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
-    }
+                return http.build();
+        }
 
 }
