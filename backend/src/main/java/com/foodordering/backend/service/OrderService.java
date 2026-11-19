@@ -2,6 +2,8 @@
 package com.foodordering.backend.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -12,6 +14,8 @@ import com.foodordering.backend.dto.OrderResponse;
 
 import com.foodordering.backend.entity.Cart;
 import com.foodordering.backend.entity.CartItem;
+import com.foodordering.backend.entity.Coupon;
+import com.foodordering.backend.entity.CouponRedemption;
 import com.foodordering.backend.entity.CustomerAddress;
 import com.foodordering.backend.entity.CustomerOrder;
 import com.foodordering.backend.entity.MenuItem;
@@ -26,6 +30,8 @@ import com.foodordering.backend.entity.Role;
 import com.foodordering.backend.entity.User;
 
 import com.foodordering.backend.repository.CartRepository;
+import com.foodordering.backend.repository.CouponRedemptionRepository;
+import com.foodordering.backend.repository.CouponRepository;
 import com.foodordering.backend.repository.CustomerAddressRepository;
 import com.foodordering.backend.repository.CustomerOrderRepository;
 
@@ -40,6 +46,10 @@ public class OrderService {
     private final CustomerOrderRepository customerOrderRepository;
 
     private final CustomerAddressRepository addressRepository;
+
+    private final CouponRepository couponRepository;
+
+    private final CouponRedemptionRepository couponRedemptionRepository;
 
     @Transactional
     public OrderResponse placeOrder(OrderRequest request, User customer) {
@@ -103,9 +113,9 @@ public class OrderService {
 
         order.setDeliveryPhone(selectedAddress.getPhone());
 
-        // Step 6: Calculate the order total and create order items.
+        // Step 6: Calculate the order subtotal and create order items.
 
-        BigDecimal totalAmount = BigDecimal.ZERO;
+        BigDecimal subtotalAmount = BigDecimal.ZERO;
 
         for (CartItem cartItem : cartItems) {
 
@@ -130,7 +140,7 @@ public class OrderService {
 
             BigDecimal unitPrice = menuItem.getPrice();
 
-            BigDecimal subtotal = unitPrice.multiply(
+            BigDecimal itemSubtotal = unitPrice.multiply(
                     BigDecimal.valueOf(cartItem.getQuantity()));
 
             OrderItem orderItem = new OrderItem();
@@ -145,22 +155,57 @@ public class OrderService {
 
             orderItem.setQuantity(cartItem.getQuantity());
 
-            orderItem.setSubtotal(subtotal);
+            orderItem.setSubtotal(itemSubtotal);
 
             order.getItems().add(orderItem);
 
-            totalAmount = totalAmount.add(subtotal);
+            subtotalAmount = subtotalAmount.add(itemSubtotal);
         }
 
-        order.setTotalAmount(totalAmount);
+        // Step 7: Calculate the coupon discount if a coupon was provided.
 
-        // Step 7: Create the Cash on Delivery payment.
+        BigDecimal discountAmount = BigDecimal.ZERO;
+
+        Coupon appliedCoupon = null;
+
+        String couponCode = request.getCouponCode();
+
+        if (couponCode != null && !couponCode.isBlank()) {
+
+            // Lock the coupon row while processing this order.
+
+            appliedCoupon = couponRepository
+                    .findByCodeIgnoreCaseForUpdate(couponCode.trim())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Invalid coupon code"));
+
+            validateCoupon(appliedCoupon, customer, subtotalAmount);
+
+            discountAmount = calculateDiscount(
+                    appliedCoupon,
+                    subtotalAmount);
+        }
+
+        // Step 8: Store subtotal, discount and final amount.
+
+        BigDecimal finalAmount = subtotalAmount.subtract(discountAmount);
+
+        order.setSubtotalAmount(subtotalAmount);
+
+        order.setDiscountAmount(discountAmount);
+
+        order.setCouponCode(
+                appliedCoupon != null ? appliedCoupon.getCode() : null);
+
+        order.setTotalAmount(finalAmount);
+
+        // Step 9: Create the Cash on Delivery payment.
 
         Payment payment = new Payment();
 
         payment.setCustomerOrder(order);
 
-        payment.setAmount(order.getTotalAmount());
+        payment.setAmount(finalAmount);
 
         payment.setPaymentMethod(PaymentMethod.CASH_ON_DELIVERY);
 
@@ -168,18 +213,135 @@ public class OrderService {
 
         order.setPayment(payment);
 
-        // Step 8: Save the order.
+        // Step 10: Save the order.
 
         CustomerOrder savedOrder = customerOrderRepository.save(order);
 
-        // Step 9: Clear the customer's cart.
+        // Step 11: Record coupon redemption and update its usage count.
+
+        if (appliedCoupon != null) {
+
+            CouponRedemption redemption = new CouponRedemption();
+
+            redemption.setCoupon(appliedCoupon);
+
+            redemption.setCustomer(customer);
+
+            redemption.setCustomerOrder(savedOrder);
+
+            couponRedemptionRepository.save(redemption);
+
+            appliedCoupon.setUsedCount(
+                    appliedCoupon.getUsedCount() + 1);
+
+            couponRepository.save(appliedCoupon);
+        }
+
+        // Step 12: Clear the customer's cart.
 
         cart.getItems().clear();
 
         return new OrderResponse(savedOrder);
     }
 
+    // Validate whether the customer can use the coupon.
+
+    private void validateCoupon(
+            Coupon coupon,
+            User customer,
+            BigDecimal subtotalAmount) {
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (!coupon.isActive()) {
+            throw new IllegalArgumentException(
+                    "This coupon is currently inactive");
+        }
+
+        if (now.isBefore(coupon.getStartDate())) {
+            throw new IllegalArgumentException(
+                    "This coupon is not available yet");
+        }
+
+        if (now.isAfter(coupon.getExpiryDate())) {
+            throw new IllegalArgumentException(
+                    "This coupon has expired");
+        }
+
+        if (coupon.getUsedCount() >= coupon.getUsageLimit()) {
+            throw new IllegalArgumentException(
+                    "This coupon has reached its usage limit");
+        }
+
+        if (subtotalAmount.compareTo(coupon.getMinimumOrderAmount()) < 0) {
+            throw new IllegalArgumentException(
+                    "Minimum order amount for this coupon is "
+                            + coupon.getMinimumOrderAmount());
+        }
+
+        boolean alreadyRedeemed = couponRedemptionRepository
+                .existsByCoupon_IdAndCustomer_Id(
+                        coupon.getId(),
+                        customer.getId());
+
+        if (alreadyRedeemed) {
+            throw new IllegalArgumentException(
+                    "You have already used this coupon");
+        }
+    }
+
+    // Calculate the discount based on the coupon type.
+
+    private BigDecimal calculateDiscount(
+            Coupon coupon,
+            BigDecimal subtotalAmount) {
+
+        BigDecimal discount;
+
+        switch (coupon.getDiscountType()) {
+
+            case PERCENTAGE:
+
+                discount = subtotalAmount
+                        .multiply(coupon.getDiscountValue())
+                        .divide(
+                                new BigDecimal("100"),
+                                2,
+                                RoundingMode.HALF_UP);
+
+                break;
+
+            case FIXED:
+
+                discount = coupon.getDiscountValue();
+
+                break;
+
+            default:
+
+                throw new IllegalArgumentException(
+                        "Unsupported coupon discount type");
+        }
+
+        // Apply the maximum discount limit if configured.
+
+        if (coupon.getMaximumDiscount() != null
+                && discount.compareTo(coupon.getMaximumDiscount()) > 0) {
+
+            discount = coupon.getMaximumDiscount();
+        }
+
+        // A discount cannot be greater than the order subtotal.
+
+        if (discount.compareTo(subtotalAmount) > 0) {
+            discount = subtotalAmount;
+        }
+
+        return discount.setScale(2, RoundingMode.HALF_UP);
+    }
+
     // Build a permanent address snapshot for the order.
+
     private String buildDeliveryAddress(CustomerAddress address) {
 
         StringBuilder result = new StringBuilder();
@@ -202,6 +364,7 @@ public class OrderService {
     }
 
     // Add an address component with a comma separator.
+
     private void appendAddressPart(StringBuilder result, String value) {
 
         if (value != null && !value.isBlank()) {

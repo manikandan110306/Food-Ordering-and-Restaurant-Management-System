@@ -59,6 +59,11 @@ public class SecurityConfig {
                                                                 org.springframework.http.HttpMethod.GET,
                                                                 "/api/reviews/restaurant/**")
                                                 .permitAll()
+                                                
+                                                .requestMatchers(
+                                                                org.springframework.http.HttpMethod.GET,
+                                                                "/api/coupons/available")
+                                                .permitAll()
 
                                                 .anyRequest().authenticated())
 

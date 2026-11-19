@@ -1,3 +1,4 @@
+
 package com.foodordering.backend.entity;
 
 import java.math.BigDecimal;
@@ -63,6 +64,19 @@ public class CustomerOrder {
     @Column(nullable = false, length = 30)
     private OrderStatus status = OrderStatus.PENDING;
 
+    // Original order amount before applying a coupon.
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal subtotalAmount = BigDecimal.ZERO;
+
+    // Amount deducted using the coupon.
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    // Coupon code used for this particular order.
+    @Column(length = 50)
+    private String couponCode;
+
+    // Final amount payable after discount.
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
 

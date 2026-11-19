@@ -1,3 +1,4 @@
+
 package com.foodordering.backend.dto;
 
 import java.math.BigDecimal;
@@ -5,8 +6,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.foodordering.backend.entity.CustomerOrder;
-
-import com.foodordering.backend.entity.OrderItem;
 
 import lombok.Getter;
 
@@ -22,6 +21,12 @@ public class OrderResponse {
     private String orderStatus;
 
     private List<OrderItemResponse> items;
+
+    private BigDecimal subtotalAmount;
+
+    private BigDecimal discountAmount;
+
+    private String couponCode;
 
     private BigDecimal totalAmount;
 
@@ -47,6 +52,12 @@ public class OrderResponse {
                 .stream()
                 .map(OrderItemResponse::new)
                 .toList();
+
+        this.subtotalAmount = order.getSubtotalAmount();
+
+        this.discountAmount = order.getDiscountAmount();
+
+        this.couponCode = order.getCouponCode();
 
         this.totalAmount = order.getTotalAmount();
 
