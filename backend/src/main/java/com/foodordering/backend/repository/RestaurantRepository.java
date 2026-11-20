@@ -28,6 +28,8 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, Long> {
             String address
     );
 
+    long countByStatus(RestaurantStatus status);
+
     @Query("""
             SELECT new com.foodordering.backend.dto.RestaurantRatingResponse(
                 r.id,

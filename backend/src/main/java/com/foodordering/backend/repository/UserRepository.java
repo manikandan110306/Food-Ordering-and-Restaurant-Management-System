@@ -5,11 +5,14 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.foodordering.backend.entity.User;
+import com.foodordering.backend.entity.Role;
 
-public interface UserRepository extends JpaRepository<User,Long>{
+public interface UserRepository extends JpaRepository<User, Long> {
 
-    Optional<User>findByEmail(String email);
+    Optional<User> findByEmail(String email);
 
     boolean existsByEmail(String email);
-    
+
+    long countByRole(Role role);
+
 }
