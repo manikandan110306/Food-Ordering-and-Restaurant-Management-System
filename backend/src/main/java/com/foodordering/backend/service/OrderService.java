@@ -12,6 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.foodordering.backend.dto.OrderRequest;
 import com.foodordering.backend.dto.OrderResponse;
 
+import com.foodordering.backend.entity.NotificationType;
+import com.foodordering.backend.service.NotificationService;
+
 import com.foodordering.backend.entity.Cart;
 import com.foodordering.backend.entity.CartItem;
 import com.foodordering.backend.entity.Coupon;
@@ -46,6 +49,8 @@ public class OrderService {
     private final CustomerOrderRepository customerOrderRepository;
 
     private final CustomerAddressRepository addressRepository;
+
+    private final NotificationService notificationService;
 
     private final CouponRepository couponRepository;
 
@@ -126,8 +131,7 @@ public class OrderService {
                         menuItem.getName() + " is currently unavailable");
             }
 
-            if (menuItem.getRestaurant().getStatus()
-                    != RestaurantStatus.APPROVED) {
+            if (menuItem.getRestaurant().getStatus() != RestaurantStatus.APPROVED) {
                 throw new IllegalArgumentException(
                         "Restaurant is not approved");
             }
@@ -216,6 +220,28 @@ public class OrderService {
         // Step 10: Save the order.
 
         CustomerOrder savedOrder = customerOrderRepository.save(order);
+
+        // Step 11: Notify the customer about successful order placement.
+
+        notificationService.createNotification(
+                customer,
+                "Order Placed Successfully",
+                "Your order #" + savedOrder.getId()
+                        + " has been placed successfully at "
+                        + restaurant.getName() + ".",
+                NotificationType.ORDER_UPDATE);
+
+        // Step 12: Notify the restaurant owner about the new order.
+
+        User restaurantOwner = restaurant.getOwner();
+
+        notificationService.createNotification(
+                restaurantOwner,
+                "New Order Received",
+                "You have received a new order #"
+                        + savedOrder.getId()
+                        + ". Please review and confirm it.",
+                NotificationType.ORDER_UPDATE);
 
         // Step 11: Record coupon redemption and update its usage count.
 
@@ -476,8 +502,51 @@ public class OrderService {
 
         order.setStatus(newStatus);
 
+        // Prepare the notification message based on the new order status.
+
+        String notificationTitle = "Order Status Updated";
+
+        String notificationMessage = switch (newStatus) {
+
+            case CONFIRMED ->
+                "Your order #" + order.getId()
+                        + " has been confirmed by the restaurant.";
+
+            case PREPARING ->
+                "Your order #" + order.getId()
+                        + " is now being prepared.";
+
+            case READY ->
+                "Your order #" + order.getId()
+                        + " is ready.";
+
+            case OUT_FOR_DELIVERY ->
+                "Your order #" + order.getId()
+                        + " is out for delivery.";
+
+            case DELIVERED ->
+                "Your order #" + order.getId()
+                        + " has been delivered. Enjoy your meal!";
+
+            default ->
+                "Your order #" + order.getId()
+                        + " status has been updated to "
+                        + newStatus.name() + ".";
+        };
+
+        // Send the notification to the customer.
+
+        notificationService.createNotification(
+                order.getCustomer(),
+                notificationTitle,
+                notificationMessage,
+                NotificationType.ORDER_UPDATE);
+
+        // Save the updated order.
+
         CustomerOrder updatedOrder = customerOrderRepository.save(order);
 
         return new OrderResponse(updatedOrder);
+
     }
 }

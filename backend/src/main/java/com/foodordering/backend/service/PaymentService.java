@@ -1,15 +1,19 @@
+
 package com.foodordering.backend.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.foodordering.backend.dto.PaymentResponse;
+
+import com.foodordering.backend.entity.NotificationType;
 import com.foodordering.backend.entity.OrderStatus;
 import com.foodordering.backend.entity.Payment;
 import com.foodordering.backend.entity.PaymentMethod;
 import com.foodordering.backend.entity.PaymentStatus;
 import com.foodordering.backend.entity.Role;
 import com.foodordering.backend.entity.User;
+
 import com.foodordering.backend.repository.PaymentRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -20,6 +24,8 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
 
+    private final NotificationService notificationService;
+
     @Transactional(readOnly = true)
     public PaymentResponse getPaymentByOrderId(
             Long orderId,
@@ -27,6 +33,7 @@ public class PaymentService {
     ) {
 
         // Step 1: Check whether the logged-in user is a customer.
+
         if (customer.getRole() != Role.CUSTOMER) {
             throw new IllegalArgumentException(
                     "Only customers can view their payment details"
@@ -34,6 +41,7 @@ public class PaymentService {
         }
 
         // Step 2: Find the payment associated with the order.
+
         Payment payment = paymentRepository
                 .findByCustomerOrderId(orderId)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -41,6 +49,7 @@ public class PaymentService {
                 ));
 
         // Step 3: Check whether the order belongs to this customer.
+
         if (!payment.getCustomerOrder()
                 .getCustomer()
                 .getId()
@@ -52,6 +61,7 @@ public class PaymentService {
         }
 
         // Step 4: Return payment details.
+
         return new PaymentResponse(payment);
     }
 
@@ -62,6 +72,7 @@ public class PaymentService {
     ) {
 
         // Step 1: Check whether the logged-in user is a restaurant owner.
+
         if (owner.getRole() != Role.RESTAURANT_OWNER) {
             throw new IllegalArgumentException(
                     "Only restaurant owners can update payment status"
@@ -69,6 +80,7 @@ public class PaymentService {
         }
 
         // Step 2: Find the payment associated with the order.
+
         Payment payment = paymentRepository
                 .findByCustomerOrderId(orderId)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -76,6 +88,7 @@ public class PaymentService {
                 ));
 
         // Step 3: Verify that the order belongs to this restaurant owner.
+
         if (!payment.getCustomerOrder()
                 .getRestaurant()
                 .getOwner()
@@ -88,6 +101,7 @@ public class PaymentService {
         }
 
         // Step 4: Check whether the payment method is COD.
+
         if (payment.getPaymentMethod() != PaymentMethod.CASH_ON_DELIVERY) {
             throw new IllegalArgumentException(
                     "This operation is only available for Cash on Delivery"
@@ -95,6 +109,7 @@ public class PaymentService {
         }
 
         // Step 5: Check whether the order has been delivered.
+
         if (payment.getCustomerOrder().getStatus() != OrderStatus.DELIVERED) {
             throw new IllegalArgumentException(
                     "Payment can only be collected after order delivery"
@@ -102,6 +117,7 @@ public class PaymentService {
         }
 
         // Step 6: Check whether payment is already completed.
+
         if (payment.getPaymentStatus() != PaymentStatus.PENDING) {
             throw new IllegalArgumentException(
                     "Payment is not in PENDING status"
@@ -109,12 +125,30 @@ public class PaymentService {
         }
 
         // Step 7: Update payment status.
+
         payment.setPaymentStatus(PaymentStatus.PAID);
 
         // Step 8: Save the updated payment.
+
         Payment updatedPayment = paymentRepository.save(payment);
 
-        // Step 9: Return updated payment details.
+        // Step 9: Notify the customer about successful payment collection.
+
+        User customer = payment.getCustomerOrder().getCustomer();
+
+        notificationService.createNotification(
+                customer,
+                "Payment Collected Successfully",
+                "Your payment of Rs. "
+                        + updatedPayment.getAmount().toPlainString()
+                        + " for order #"
+                        + payment.getCustomerOrder().getId()
+                        + " has been collected successfully.",
+                NotificationType.PAYMENT_UPDATE
+        );
+
+        // Step 10: Return updated payment details.
+
         return new PaymentResponse(updatedPayment);
     }
 }

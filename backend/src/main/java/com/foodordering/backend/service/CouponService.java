@@ -1,3 +1,4 @@
+
 package com.foodordering.backend.service;
 
 import java.math.BigDecimal;
@@ -10,9 +11,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.foodordering.backend.dto.CouponRequest;
 import com.foodordering.backend.dto.CouponResponse;
+
 import com.foodordering.backend.entity.Coupon;
 import com.foodordering.backend.entity.DiscountType;
+import com.foodordering.backend.entity.NotificationType;
+import com.foodordering.backend.entity.Role;
+import com.foodordering.backend.entity.User;
+
 import com.foodordering.backend.repository.CouponRepository;
+import com.foodordering.backend.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,7 +29,12 @@ public class CouponService {
 
     private final CouponRepository couponRepository;
 
-    // Create a new coupon
+    private final UserRepository userRepository;
+
+    private final NotificationService notificationService;
+
+    // Create a new coupon.
+
     @Transactional
     public CouponResponse createCoupon(CouponRequest request) {
 
@@ -77,12 +89,41 @@ public class CouponService {
 
         Coupon savedCoupon = couponRepository.save(coupon);
 
-        // Step 6: Return the response.
+        // Step 6: Notify customers if the coupon is currently available.
+
+        LocalDateTime now = LocalDateTime.now();
+
+        boolean couponAvailable = savedCoupon.isActive()
+                && !now.isBefore(savedCoupon.getStartDate())
+                && !now.isAfter(savedCoupon.getExpiryDate());
+
+        if (couponAvailable) {
+
+            List<User> customers = userRepository.findAll()
+                    .stream()
+                    .filter(user -> user.getRole() == Role.CUSTOMER)
+                    .toList();
+
+            for (User customer : customers) {
+
+                notificationService.createNotification(
+                        customer,
+                        "New Special Offer!",
+                        "A new coupon " + savedCoupon.getCode()
+                                + " is available. Apply it during checkout "
+                                + "to enjoy a discount.",
+                        NotificationType.PROMOTION
+                );
+            }
+        }
+
+        // Step 7: Return the response.
 
         return new CouponResponse(savedCoupon);
     }
 
-    // Retrieve all coupons for admin
+    // Retrieve all coupons for admin.
+
     @Transactional(readOnly = true)
     public List<CouponResponse> getAllCoupons() {
 
@@ -92,7 +133,8 @@ public class CouponService {
                 .toList();
     }
 
-    // Retrieve coupons currently available to customers
+    // Retrieve coupons currently available to customers.
+
     @Transactional(readOnly = true)
     public List<CouponResponse> getAvailableCoupons() {
 
@@ -109,7 +151,8 @@ public class CouponService {
                 .toList();
     }
 
-    // Activate or deactivate a coupon
+    // Activate or deactivate a coupon.
+
     @Transactional
     public CouponResponse updateCouponStatus(Long couponId, boolean active) {
 
@@ -124,7 +167,8 @@ public class CouponService {
         return new CouponResponse(updatedCoupon);
     }
 
-    // Validate coupon details before saving
+    // Validate coupon details before saving.
+
     private void validateCoupon(CouponRequest request) {
 
         // Validate discount type.
